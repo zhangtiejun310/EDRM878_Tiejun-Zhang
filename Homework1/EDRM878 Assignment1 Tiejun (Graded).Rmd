@@ -1,0 +1,158 @@
+---
+title: "EDRM878 - Assignment 1 (Graded)"
+author: "Tiejun Zhang"
+output: html_notebook
+---
+
+***
+
+##### Grading comments
+
+**Nice work! My main recommendation is that you include interaction plots**
+**to support your interaction statements.**
+
+**For the last problem, I think you meant 22 instead of 12, otherwise it would**
+**not be a difference of 15 seconds.**
+
+**Score: 20/20**
+
+***
+
+## 1.9. Children were asked to build towers as high as they could out of cubical and cylindrical blocks [9, 17]. The number of blocks used and the time taken were recorded.
+
+### 1.Load the data frame blocks from the package GLMsData, and produce a summary of the variables.
+```{r}
+# install.packages("GLMsData")
+library(GLMsData)
+data("blocks")
+str(blocks)
+summary(blocks)
+```
+
+### 2.Produce plots to examine the relationship between the time taken to build towers, and the block type, trial number, and age.
+```{r}
+# Time and Block type
+plot(Time ~ Shape,
+     data = blocks,
+     xlab = "Shape",
+     ylab = "Time (in minutes)",
+     main = "Time vs Shape",
+     las = 1)
+
+# Time and Trial number
+plot(Time ~ Trial,
+     data = blocks,
+     xlab = "Trial",
+     ylab = "Time (in minutes)",
+     main = "Time vs Trial",
+     las = 1)
+
+# Time and Age
+plot(Time ~ Age,
+     data = blocks,
+     xlab = "Age",
+     ylab = "Time (in minutes)",
+     main = "Time vs Age",
+     las = 1)
+```
+
+### 3.In words, summarize the relationship between the four variables.
+
+   Time and Block type: Building cube towers on average requires more time than buding cylinder towers.
+   Time and Trial number: no obvious pattern to indicate a relationship
+   Time and Age: no obvious pattern to indicate a relationship
+
+### 4.Produce plots to examine the relationship between the number of blocks used to build towers, and the block type, trial number, and age.
+```{r}
+# Number and Block type
+plot(Number ~ Shape,
+     data = blocks,
+     xlab = "Shape",
+     ylab = "Number",
+     main = "Number vs Shape",
+     las = 1)
+
+# Number and Trial number
+plot(Number ~ Trial,
+     data = blocks,
+     xlab = "Trial",
+     ylab = "Number",
+     main = "Number vs Trial",
+     las = 1)
+
+# Number and Age
+plot(Time ~ Age,
+     data = blocks,
+     xlab = "Age",
+     ylab = "Number",
+     main = "Number vs Age",
+     las = 1)
+```
+
+### 5.Summarize the relationship between the four variables in words.
+
+   Number and Block type: Building cube towers on average requires more blocks than buding cylinder towers.
+   Number and Trial number: no obvious pattern to indicate a relationship
+   Number and Age: no obvious pattern to indicate a relationship
+
+
+
+
+## 2.18. Children were asked to build towers out of cubical and cylindrical blocks as high as they could [8, 12], and the number of blocks used and the time taken were recorded (Table 2.12; data set: blocks). In this Problem, we focus on the time taken to build the towers. (The number of blocks used to build towers is studied in Problem 10.19.)
+
+### 1.The data were originally examined in Problem 1.9 (p. 28). Using these plots, summarize the possible relationships of the explanatory variables with the time taken. Which assumptions, if any, appear to be violated?
+
+   Time and Block type: Building cube towers on average requires more time than buding cylinder towers.
+   Time and Trial number: no obvious pattern to indicate a relationship
+   Time and Age: no obvious pattern to indicate a relationship
+   
+   The relationships are not linear.
+
+### 2.Suppose a model with the systematic component Time ~ Age * Shape was needed to model the data. What would such a systematic component imply about the relationship between the variables?
+   
+   This is an interaction effect of a continuous predictor and factor. The relationship between time and age is different for the two shapes.
+
+### 3.Suppose a model with the systematic component Time ~ Age * Trial was needed to model the data. What would such a systematic component imply about the relationship between the variables?
+
+   This is an interaction effect of two continuous predictors. The relationship between time and age changes as the value of trial number changes. 
+
+### 4.Suppose a model with the systematic component Time ~ (Age + Shape) * Trial was needed to model the data. What would such a systematic component imply about the relationship between the variables?
+  
+  The relationship between time and age, time and shape, both depend on the trial number.
+
+### 5.One hypothesis of interest is whether the time taken to build the tower differs between cubical and cylindrical shaped blocks. Test this hypothesis by fitting a linear regression model.
+
+```{r}
+full.model <- lm (Time ~ Shape + Age + Trial, data = blocks)
+anova(full.model)
+```
+   The ANOVA test shows that time taken to build the tower differs between cubical and cylindrical shaped blocks (Shape: p < 0.05).
+
+
+### 6.Another hypothesis of interest is that older children take less time to build the towers than younger children, but the difference would depend on the type of block. Test this hypothesis.
+```{r}
+int.model <- lm(Time ~ Age*Shape, data = blocks)
+anova(int.model)
+summary(int.model)
+```
+
+   There is not enough statistical evidence to infer an interaction effect of age and shape     on time (p < 0.05).
+
+### 7.Find a suitable linear regression model for the time taken to build the towers. Do you think this model is suitable? Explain.
+```{r}
+m0 <- lm(Time ~ 1, data = blocks)
+m1 <- update(m0, . ~ . + Shape)
+m2 <- update(m1, . ~ . + Age)
+m3 <- update(m2, . ~ . + Trial)
+
+anova(m3)
+
+summary(m1)
+```
+   The sequential tests suggest that only block type is an effective preditor (p < 0.05) for    the time taken to build the tower. The simple linaer model (Time ~ Shape) is the most parsimous model and has no significant difference from the complete model or other nested model.
+
+### 8.Interpret your final model.
+   
+   The time taken to build the tower differs by about 15 minutes between cubical and cylindrical shaped blocks without adjusting other explanatory variables. Children in this study on average spent 37 minutes for building cubical towers, and 12 minutes for building cylindrical towers.
+   
+
