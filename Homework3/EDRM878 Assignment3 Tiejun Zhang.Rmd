@@ -1,0 +1,95 @@
+---
+title: "EDRM878 Assignment3"
+author: Tiejun Zhang
+output: html_notebook
+---
+### 5.25. Children were asked to build towers as high as they could out of cubical and cylindrical blocks [2, 9]. The number of blocks used and the time taken were recorded (Table 2.12; data set: blocks). In this problem, only consider the number of blocks used y and the age of the child x.
+```{r}
+data(blocks)
+summary(blocks)
+```
+
+#### 1.Plot the number of blocks used against the age of the child.
+```{r}
+scatter.smooth(jitter(blocks$Number) ~ blocks$Age, main = "Number of Blocks vs Age", xlab = "Age", ylab = "Number of blocks")
+```
+
+
+#### 2.From the plot and an understanding of the data, answer the two questions in Sect. 5.2 (p. 211) for these data, and hence propose a glm for the data.
+
+What probability distribution is appropriate?
+
+The plot indicates a non-linear relationship. Additionally, the variance tends to increases as the mean increases. As the response is the number of blocks(counts), the poisson distribution might be an appropriate option.
+
+
+How are the explanatory variables related to the mean of the response $??$?
+```{r}
+# cut age into three groups
+age.cut <- cut(blocks$Age, 3)
+summary(age.cut)
+
+# calculate the mean, varance and length for each age group.
+mn <- tapply(blocks$Number, age.cut, "mean")
+vr <- tapply(blocks$Number, age.cut, "var")
+sz <- tapply(blocks$Number, age.cut, "length")
+
+cbind("Group size" = sz, "Group mean" = mn, "Group variance" = vr)
+
+```
+As we can see from the output, the variance increases as the mean gets larger.
+
+Side-by-side boxplots to present the trend.
+```{r}
+plot(jitter(Number) ~ (age.cut),
+     pch = 1,
+     las = 1,
+     data = blocks,
+     xlab = "Age Groups",
+     ylab = "Number of blocks")
+
+
+```
+
+Plot of log of group means against log of group Variance
+```{r}
+plot(log(vr) ~ log(mn),
+     pch = 19,
+     las = 1,
+     cex = 0.45 * sqrt(sz),
+     xlab = "Log of means",
+     ylab = "Log of variances")
+```
+
+The variance as a function of the mean.
+```{r}
+hm.lm <- lm(log(vr) ~ log(mn), weights = sz)
+coef(hm.lm)
+confint(hm.lm)
+
+# dispersion index
+exp(coef(hm.lm)[1])
+```
+The dispersion index is 0.08 and the variance function is $mean$^2.1.Given the data is discrete in nature, poisson distribution is appropriate.
+
+
+### 6.10. Children were asked to build towers as high as they could out of cubical and cylindrical blocks [3, 6]. The number of blocks used and the time taken were recorded (data set: blocks). In this problem, only consider the number of blocks used y and the age of the child x. In Problem 5.25, a glm was proposed for these data.
+#### 1.Fit this glm using r, and write down the fitted model.
+```{r}
+m1 <- glm(Number~Age, data=blocks, family=poisson(link = "log"))
+m1
+```
+
+#### 2.Determine the standard error for each regression parameter.
+```{r}
+summary(m1)
+```
+Both coefficients (beta0 and beta1) have a p value less than 0.05, indicating a strong relationship. The standard error is 0.22 for beta0 and 0.05 for beta1.
+
+#### 3.Compute the residual deviance.
+
+```{r}
+deviance(m1)
+```
+
+The residual deviance is 62.24.
+
