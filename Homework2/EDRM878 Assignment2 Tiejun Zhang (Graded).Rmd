@@ -1,0 +1,139 @@
+---
+title: "EDRM878 Homework 2"
+author: Tiejun Zhang
+output: html_notebook
+---
+
+
+### 3.16.Children were asked to build towers out of cubical and cylindrical blocks as high as they could [20, 33], and the number of blocks used and the time taken were recorded. The data (data set: blocks) and a fuller description are given in Problem 2.18 (p. 88). In that problem, a linear regression model was fitted to model the time to build the towers, based on the initial examination in Problem 1.9 (p. 28).
+
+```{r}
+library(GLMsData)
+data(blocks)
+str(blocks)
+summary(blocks)
+```
+
+
+#### 1.Perform a diagnostic analysis of the linear regression model fitted in Problem 2.18 (p. 88), and show a transformation of the response is necessary.
+
+```{r}
+# fit model
+linear.model <-lm(Time~Shape, data = blocks)
+summary(linear.model)
+```
+The model only has one explanatory variable "Shape". It is a factor of two levels: Cube and Cylinder.
+
+```{r}
+# linearity check
+plot(rstandard(linear.model) ~ blocks$Shape, ylab = "Standardized residuals", xlab = "Shape", main = "Fig.1 Standardized Residuals against Shape")
+```
+Fig1 suggests that the relationship between the residuals and Shape is not linear, for Shape is a two-level factor.
+
+```{r}
+# Constant variance check
+plot(rstandard(linear.model) ~ fitted(linear.model), ylab = "Standardized residuals", xlab = "Fitted values", main = "Fig.2 Standardized Residuals against Fitted Values")
+```
+Fig2 shows that the variance differs between cubes and cylinders. The cube group is less variant than the cylinder group.
+
+```{r}
+# normality check
+qqnorm(rstandard(linear.model), las = 1, pch = 19, main = "Fig.3 Standardized Residuals against Normal Quantiles")
+qqline(rstandard(linear.model))
+```
+
+Fig3 indicates the residuals are not normally distributed. The distribution has a heavy up tail. 
+
+```{r}
+# Influential Observations
+inf_ms <- influence.measures(linear.model)
+
+# Influential on three criteria
+rowSums(inf_ms$is.inf)
+table(rowSums(inf_ms$is.inf))
+
+# Influential observations
+inf_ms$is.inf[c(6, 76),]
+
+
+# Plots
+# Cook,s distance
+plot(cooks.distance(linear.model), type = "h", main = "Cook's distance", ylab = "D", xlab = "Observation number", las = 1)
+
+# DFFITS
+plot(dffits(linear.model), type = "h", main = "DFFITS", ylab = "DFFITS", xlab = "Observation number", las = 1)
+
+# DFBETAS
+plot(dfbetas(linear.model)[, 2], type = "h", main = "DFBETAS for beta2", ylab = "DFBETAS", xlab = "Observation number", las = 1)
+
+```
+98 observations are not declared influential on any of the criteria; Observation 6 is identified influnetial on all three criteria and observation 76 is declared influential on two criteria.
+
+The residuals show non-normality, non-constant variance and two influential observations, therefore, it is necessary to transform the response variable.
+
+
+#### 2.Fit an appropriate linear regression model to the data after applying the transformation, ensuring a diagnostic analysis.
+
+```{r}
+# fit model
+m0 <- lm(log(Time) ~ 1, data = blocks)
+m1 <- update(m0, . ~ . + Shape*Age)
+anova(m1)
+
+t.model <- lm(log(Time) ~ Shape, data = blocks)
+
+```
+The sequential tests suggest that only Shape is an effective predictor (p < 0.05) for the log-tranformed response.
+
+Diagnostic Analysis
+```{r}
+plot(rstandard(t.model) ~ blocks$Shape, ylab = "Standardized residuals", xlab = "Shape", main = "Fig.4 Standardized Residuals against Shape")
+```
+Fig4 still shows a non-linear relationship but with less extreme points on up tail.
+
+```{r}
+# Constant variance check
+plot(rstandard(t.model) ~ fitted(linear.model), ylab = "Standardized residuals", xlab = "Fitted values", main = "Fig.5 Standardized Residuals against Fitted Values")
+```
+Fig5 shows the variance appear to be constant between two shapes.
+
+
+```{r}
+# normality check
+qqnorm(rstandard(t.model), las = 1, pch = 19, main = "Fig.6 Standardized Residuals against Normal Quantiles")
+qqline(rstandard(t.model))
+```
+Fig6 indicates that the residuals are quite close to a normal distribution.
+
+```{r}
+# Influential Observations
+trf_inf_ms <- influence.measures(t.model)
+
+# Influential on three criteria
+rowSums(trf_inf_ms$is.inf)
+table(rowSums(trf_inf_ms$is.inf))
+
+# Influential observations
+trf_inf_ms$is.inf[c(6, 76),]
+
+# Plots
+# Cook's distance
+plot(cooks.distance(t.model), type = "h", main = "Cook's distance", ylab = "D", xlab = "Observation number", las = 1)
+
+# DFFITS
+plot(dffits(t.model), type = "h", main = "DFFITS", ylab = "DFFITS", xlab = "Observation number", las = 1)
+
+# DFBETAS
+plot(dfbetas(t.model)[, 2], type = "h", main = "DFBETAS for beta2", ylab = "DFBETAS", xlab = "Observation number", las = 1)
+
+```
+98 observations are not declared influential on any of the criteria; Observation 6 is identified influnetial on two criteria and observation 76 is declared influential on just one criterion.
+
+Overall, the model fit improved after a log-tranform of the response.
+
+***
+
+**Very nicely done!**
+
+**20/20**
+
