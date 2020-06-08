@@ -1,0 +1,160 @@
+---
+title: "EDRM878 Assignment4"
+author: Tiejun Zhang
+output: html_notebook
+---
+
+### 7.4. Children were asked to build towers as high as they could out of cubical and cylindrical blocks [3, 7]. The number of blocks used and the time taken were recorded (data set: blocks). In this problem, only consider the number of blocks used y and the age of the child x. In Problem 6.10, a glm was fitted for these data.
+
+#### 1.Use a Wald test to determine if age seems necessary in the model.
+```{r}
+
+data(blocks)
+
+# fit the model
+m1 <- glm(Number ~ Age, data = blocks, family = poisson(link = "log"))
+printCoefmat(coef(summary(m1)))
+
+```
+The test results suggest that age is necessary in the model (z = 2.65, p = 0.008).
+
+
+#### 2.Use a score test to determine if age seems necessary in the model.
+```{r}
+
+# library(statmod)
+m0 <- glm(Number ~ 1, data=blocks, family=poisson(link = "log"))
+z.stat <- glm.scoretest(m0, blocks$Age)
+p.val <- 2 * pnorm(abs(z.stat), lower.tail = FALSE)
+round(c(score.stat = z.stat, P = p.val), 4)
+
+```
+The test results also suggest that age is necessary in the model (z = 2.65, p = 0.008).
+
+
+#### 3.Use a likelihood ratio test to determine if age seems necessary in the model.
+```{r}
+
+m0 <- glm(Number ~ 1, data = blocks, family = poisson(link = "log"))
+m1 <- glm(Number~ Age, data = blocks, family = poisson(link = "log"))
+
+anova(m1, test = "Chisq")
+
+```
+The test results still suggest that age is necessary in the model(chisq = 7.19, p = 0.007).
+
+
+#### 4.Compare the results from the Wald, score and likelihood ratio tests. Comment.
+
+All the three tests show that age is an effective predictor in the model, but the likelyhood ratio test is the most robust test (p = 0.007). The score test and likelihood ratio test have similar results and are comparatively conservative (p = 0.008)
+
+
+#### 5.Is the saddlepoint approximation expected to be accurate? Explain.
+```{r}
+
+min(blocks$Number)
+
+```
+Yes, because the saddlepoint approximation is sufficiently accurate when min(yi) >= 3 for a Poisson distribution.
+
+
+#### 6.Is the Central Limit Theorem expected to be accurate? Explain.
+
+No, the CLT only works well when (yi) >= 5 for a Poisson distribution.
+
+
+#### 7.Find the 95% Wald confidence intervals for the regression coefficients.
+```{r}
+
+confint(m1)
+
+```
+
+
+
+#### 8.Plot the number of blocks used against age, and show the relationship described by the fitted model. Also plot the lines indicating the lower and upper 95% confidence intervals for these fitted values.
+
+```{r}
+
+new.Age <- seq( min(blocks$Age), max(blocks$Age), length = 100)
+new.Num <- predict(m1, 
+                   se.fit = TRUE,
+                   newdata = data.frame(Age = new.Age),
+                   type = "response")
+
+
+zstar <- qnorm(0.975)
+ci.lo <- new.Num$fit - zstar * new.Num$se.fit
+ci.hi <- new.Num$fit + zstar * new.Num$se.fit
+
+plot( jitter(Number) ~ Age, data = blocks, 
+      las = 1,
+      xlab = "Age",
+      ylab = "Number of Blocks")
+
+lines(new.Num$fit ~ new.Age, lwd = 2)
+lines(ci.lo ~ new.Age, lty = 2)
+lines(ci.hi ~ new.Age, lty = 2)
+
+```
+The width of the interval is just a bit wider at both ends.
+
+
+### 8.11. Children were asked to build towers as high as they could out of cubical and cylindrical blocks [8, 14]. The number of blocks used and the time taken were recorded (data set: blocks). In this problem, only consider the number of blocks used y and the age of the child x. In Problem 6.10, a glm was fitted for these data. Perform a diagnostic analysis, and determine if the model is suitable.
+
+```{r}
+
+# fit model
+m1 <- glm(Number ~ Age, data = blocks, family = poisson(link = "log"))
+
+```
+
+
+#### Standardized residuals agianst the fitted value
+```{r}
+
+scatter.smooth(rstandard(m1) ~ fitted(m1))
+
+```
+The linear relationship looks good. The variance also looks fine.
+
+
+#### Q-Q plot for quantile residuals
+```{r}
+
+qqnorm(qresid(m1))
+qqline(qresid(m1))
+
+```
+The points are not perfectly plotted on the line, but most are not bad. The distribution of residuals appears to have heavier tails than the normal distribution in both directions
+
+#### Outliers
+```{r}
+
+rs <- cbind(rD = resid(m1),
+            "r'D" = rstandard(m1),
+            "r''" = rstudent(m1),
+            rQ = qresid(m1))
+
+head(rs)
+
+apply(abs(rs), 2, max)
+
+```
+Given a normal distribution, all three types of residuals look fine.
+
+#### Influential Observations
+```{r}
+im <- influence.measures(m1)
+names(im)
+im$infmat <- round(im$infmat, 3)
+head(im$infmat)
+colSums(im$is.inf)
+
+#plot
+plot(cooks.distance(m1), type = "h", main = "Cook's distance", ylab = "D", xlab = "Observation number", las = 1)
+
+```
+Only one method identified seven influential observations, so it shoud not be a big concern.
+
+Overall, the disagnostic analysis suggestted that the model fits the data well but not perfect.
