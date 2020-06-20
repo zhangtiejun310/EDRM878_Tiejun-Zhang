@@ -1,0 +1,225 @@
+---
+title: "EDRM878 Assignment5"
+author: Tiejun Zhang
+output: html_notebook
+---
+
+### 9.7. After the explosion of the space shuttle Challenger on January 28, 1986, a study was conducted [1, 4] to determine if previously-collected data about the ambient air temperature at the time of launch could have been used to foresee potential problems with the launch (Table 4.1; data set: shuttles).In Example 4.2, a model was proposed for these data.
+
+```{r}
+data(shuttles)
+head(shuttles)
+summary(shuttles)
+```
+
+
+#### 1. Plot the data.
+```{r}
+plot(shuttles$Damaged/6 ~ shuttles$Temp,
+     las = 1,
+     main = "Proportion of Damaged O-rings and Temperatures", 
+     ylab = "Proportion of damaged O-rings",
+     xlab = "Temperature")
+```
+The O-rings tend to fail more often at low temperatures.
+
+#### 2. Fit and interpret the proposed model.
+```{r}
+# fit the model
+shuttle.model <- glm(Damaged/6 ~ Temp,
+                data = shuttles,
+                family = binomial,
+                weights=rep(6, length(Temp)))
+
+# the effect of temperature on O-ring failure
+coef(shuttle.model)
+
+# the temperature drops by 1 Fahrenheit
+exp(-coef(shuttle.model)[2])
+
+# the temperature drops by 10 Fahrenheit
+exp(-10*coef(shuttle.model)[2])
+
+```
+The odds of O-ring failure increase by 1.12times for every 1 Fahrenheit drop in temperature, and the odds increase by 3.18 times if the temperature drops 10 Fahrenheit.
+
+#### 3. Perform a diagnostic analysis.
+
+Check for Overdispersion
+```{r}
+c(Df = df.residual(shuttle.model),
+  Resid.dev = deviance(shuttle.model),
+  Pearson.X2 = sum(resid(shuttle.model, type = "pearson")^2))
+```
+The residual deviance is smaller than the residual degrees of freedom and Pearson statistics is a bit greater than the residual degrees of freedom, not enough evidence to support overdispersion.
+
+
+Quantile Residuals vs Fitted Values
+```{r}
+qres <- qresid(shuttle.model)
+scatter.smooth(qres ~ sqrt(fitted(shuttle.model)),
+               ylab = "Quantile residuals",
+               xlab = "Sqrt(Fitted values)",
+               las = 1)
+```
+Q-Q plot
+```{r}
+qqnorm(qres, las = 1)
+abline(0, 1)
+```
+The Q-Q plot looks acceptable.
+
+
+
+Outliers
+```{r}
+
+rs <- cbind(rD = resid(shuttle.model),
+            "r'D" = rstandard(shuttle.model),
+            "r''" = rstudent(shuttle.model),
+            rQ = qresid(shuttle.model))
+
+head(rs)
+
+apply(abs(rs), 2, max)
+```
+The maximum all four types of resduals are greater than 2.5, but this shoud not be a big concern as suggeted by the Q-Q plot.
+
+
+
+Influential observations
+```{r}
+im <- influence.measures(shuttle.model)
+colSums(im$is.inf)
+rowSums(im$is.inf)
+plot(cooks.distance(shuttle.model), type = "h", main = "Cook's distance", ylab = "D", xlab = "Observation number", las = 1)
+
+```
+1 observations have high leverage, as identified by the column labelled hat, 4 observations are identified by the covariance ratio as influential, 1 observation is identified by the DIFFITS as influential, but Cook's distance does not identify any observation as influential.
+
+
+#### 4. On the day of the Challenger launch, the forecast temperature was 31???F. What is the predicted probability of an O-ring failure?
+```{r}
+predict(shuttle.model, newdata=data.frame(Temp=31), type="response")
+```
+
+
+#### 5. What would the ed50 mean in this context? What would be a more sensible ed for this context?
+
+```{r}
+library(MASS)
+
+ED50s <- dose.p(shuttle.model)
+
+ED50s
+```
+The ED50 refers to the temperature(44 Fahrenheit) at which 50% of the O-rings fail. In this case we want the O-ring failures as less as possible, a lower ED, which means less O-ring failures, is perfered.
+
+
+### 10.12. In a study of depressed women [15], women were classified into groups (Table 10.15; data set: dwomen) based on their depression level (Depression), whether a severe life event had occurred in the last year (SLE), and if they had three children under 14 at home (Children). Model these counts using a Poisson glm, and summarize the data if possible.
+
+#### Data Preparation
+```{r}
+data(dwomen)
+head(dwomen)
+summary(dwomen)
+```
+#### Removing structural zeros
+```{r}
+dwomen1 <- subset(dwomen, !(Depression == "Yes" & SLE == "No" & Children == "Yes"))
+```
+
+
+#### Frequncy Tables
+```{r}
+
+dwomen1.tab <- xtabs(Counts ~ Depression + SLE + Children,
+               data = dwomen1)
+dwomen1.tab
+```
+
+
+#### Variable Relations
+Let us take a look at the relationship between the response and the explanatory variables.
+```{r}
+plot(Counts ~ Depression, data = dwomen1)
+plot(Counts ~ SLE, data = dwomen1)
+plot(Counts ~ Children, data = dwomen1)
+
+```
+It seems that $Depression$ and $Children$ have effects on $Counts$. Observations with depression or children tend to have more counts. The effect of $SLE$ on $Counts$ is not obvious.
+
+
+#### Fit Model
+Let us start with the full model that includes all interactions and see what happens if we drop the three-way interaction.
+```{r}
+gm.1 <- glm(Counts ~ Depression * SLE * Children,
+            data = dwomen1,
+            family = poisson)
+drop1(gm.1, test="Chisq")
+```
+The three-way interaction is not necessary in the model. Let us consider dropping each twoway
+interaction in turn:
+
+```{r}
+gm.2 <- update( gm.1, . ~ (Depression  + SLE+ Children)^2 )
+drop1(gm.2, test="Chisq")
+```
+The interaction between $SLE$ and $Children$ is not necessary in the model.
+
+Now we fit the model
+```{r}
+gm.3 <- glm(Counts ~ Depression * SLE + Depression * Children,
+            data = dwomen1,
+            family = poisson)
+
+# coefficents and effect size
+coef(gm.3)
+exp(coef(gm.3))
+
+```
+The count of those who have depression and children is 11.5 times what it is for those who don't have depression and children.
+The count of those who have depression and SLE is 4.1 times what it is for those who don't have depression and SLE.
+
+#### Diagnostic Analysis
+Check for Overdispersion
+```{r}
+c(Df = df.residual(gm.3),
+  Resid.dev = deviance(gm.3),
+  Pearson.X2 = sum(resid(gm.3, type = "pearson")^2))
+```
+
+
+Quantile Residuals vs Fitted Values
+```{r}
+#library(statmod)
+
+qr <- qresid(gm.3)
+
+scatter.smooth(qr ~ sqrt(fitted(gm.3)),
+               ylab = "Quantile residuals",
+               xlab = "Sqrt(Fitted values)",
+               las = 1)
+```
+Q-Q plot
+```{r}
+qqnorm(qr, las = 1)
+abline(0, 1)
+```
+
+Influential observations
+```{r}
+im <- influence.measures(gm.3)
+colSums(im$is.inf)
+rowSums(im$is.inf)
+plot(cooks.distance(gm.3), type = "h", main = "Cook's distance", ylab = "D", xlab = "Observation number", las = 1)
+
+```
+
+**As you know, I'm not a fan of automated methods. It also looks like you made**
+**this too difficult. Take a look at my work for a straightforward way to**
+**build the model and interpret in specific terms.**
+
+**Nice work!**
+
+**Score: 20/20**
