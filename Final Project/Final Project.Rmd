@@ -1,0 +1,870 @@
+---
+title: "Final Project"
+author: Tiejun Zhang
+output: html_notebook
+---
+
+***
+
+### Normal
+
+The Normal distribution is used to model continuous data that have a symmetric distribution.
+
+The mean-variance relationship: $V (\mu) = 1$
+
+Dispersion: The dispersion $??$ is unknow and needs to be estimated. There are four types 
+of estimators: MLE estimator, Modified profile log-likelihood estimator, Mean deviance 
+estimator, Pearson estimator. MLE estimator is biased, unless $p'/n$ is very small, the 
+modified profile estimator is difficult to compute. In practice, the Pearson estimator 
+tends to be more variable (less precise) but less biased than the mean deviance estimator. 
+For normal GLMs, the latter three estimators make little difference.The mean deviance and 
+Pearson estimators are very convenient.The mean deviance estimator should behave well when 
+the saddlepoint approximation holds; that is, for normal or inverse Gaussian glms or when
+$??$ is relatively small.
+
+Link function: $\eta = \mu$
+
+Inference: Walds test, Likelihood ratio and score test with selected estimator.All 
+tests are based on large-sample asymptotic results, which apply when n is reasonably large. 
+Walds test is the most commonly used. Confidence intervals for $\hat{\mu}$ are found by 
+first computing confidence intervals for $\hat{\eta}$, and then applying the inverse link 
+function (that is, ?? = g???1(??)) to the lower and upper limit of the interval found for 
+$\hat{\eta}$. Likelihood ratio deals with nested models. The score test evaluates the 
+usefulness of predictors.
+
+The saddlepoint approximation is exact for the normal distribution.
+
+Diagnostic Analysis:
+The three main types of residuals are raw residuals, standardized residuals, and Studentized 
+residuals. The standardized and Studentized residuals have approximately constant variance 
+of one, and are preferred in residual plots.
+Check for independence of the responses when possible.
+Check for linearity between the responses and all covariates 
+Residuals against the fitted values
+Q-Q plot
+Cook's distance plot
+Influential observations
+
+Solutions
+If the responses are not independent, use other methods.
+If the variance of the response is not approximately constant, transform the response as 
+necessary.
+if the relationship is not linear, transform the covariates using simple transformations 
+(Sect. 3.10), polynomials in the covariates (Sect. 3.11), or regression splines (Sect. 3.12).
+
+
+
+#### Data discription
+The data set is available as the *crawl* data in the GLMsData library.
+
+The data come from a study which hypothesized that babies would take longer to 
+learn to crawl in colder months because the extra clothing restricts their 
+movement. From 1988 to 1991, researchers recorded the babies' first crawling age
+and the average monthly temperature 6 months after birth (when ``infants 
+presumably enter the window of locomotor readiness''). The parents reported the 
+birth month and age when their baby first crept or crawled a distance of four 
+feet in one minute. Data were collected at the University of Denver Infant Study
+Center on 208 boys and 206 girls, and summarized by the birth month.
+
+
+#### Variables
+
+BirthMonth: the baby's birth month
+
+Age: the mean age (in completed weeks) at which the babies born this month
+started to crawl
+
+SD: the standard deviation (in completed weeks) of the crawling ages for babies
+born this month
+
+SampleSize: the number of babies in the study born in the given month
+
+Temp: the monthly average temperature (in degrees F) six months after the birth
+month
+
+
+#### Research question
+
+What is the effect of temperature (six months after birth) on the age when babies start to 
+crawl?
+
+For every 1 (degree F) increase in temperature, the mean age for babies starting to crawl 
+woiuld be 0.08 weeks (about half day) earlier.
+
+
+
+#### Analysis
+
+1. Prepare the data and take a look at the data structure
+```{r}
+library(GLMsData)
+data(crawl)
+str(crawl)
+head(crawl)
+```
+
+2. Explore the relationship between the response and predictor.
+```{r}
+scatter.smooth(crawl$Temp,
+               crawl$Age,las = 1,
+               xlab = "Temperature (in degree F)",
+               ylab = "Mean Age (in Weeks)")
+```
+It seems that the temperature has an effect on the mean age at which the babies born this 
+month started to crawl. The mean age decreases as temperature drops down.
+
+
+3. Let us model age with temperature.
+```{r}
+crawl.model <- glm(Age ~ Temp,
+                  data = crawl,
+                  weights = SampleSize,
+                  family = gaussian)
+
+printCoefmat(coef(summary(crawl.model)))
+```
+The model test results indicate that temperature indeed exert an infulence on the mean age 
+at which the babies started to crawl. For every 1 (degree F) increase in temperature, the 
+mean age woiuld decrease by 0.08 weeks. 
+
+4. Dianostic Analysis
+
+The residuals against the fitted values, the standardized residuals was used here.
+```{r}
+scatter.smooth(rstandard(crawl.model) ~ fitted(crawl.model))
+```
+Q-Q Plot
+```{r}
+qqnorm( rstandard( crawl.model ), las=1 )
+qqline( rstandard( crawl.model ) )
+```
+
+Cook's distance
+```{r}
+plot( cooks.distance(crawl.model), type="h", las=1)
+```
+The plots look acceptable, but there is a lack of linearity.
+
+
+Influential observations
+```{r}
+im <- influence.measures(crawl.model)
+colSums(im$is.inf)
+```
+The influence diagnostics reveal that two observations are influential according
+to covariance ratio, but none are influential according to Cook's distance.
+
+
+#### Additional exercise
+
+We learned that the Wald test, the likelihood ratio test, and the score test
+all provide the same result for the normal EDM. Verify that this is the case
+for these data and your model.
+
+Wald test
+```{r}
+phi.meandev <- deviance(crawl.model) / df.residual(crawl.model)
+phi.pearson <- summary(crawl.model)$dispersion
+
+# Both the mean deviance and Pearson estimators are similar. 
+# The mean deviance estimator is used.
+printCoefmat(coef(summary(crawl.model, dispersion = phi.pearson)))
+```
+
+Likelihood ratio test
+```{r}
+anova(crawl.model, test = "F", dispersion = phi.meandev)
+```
+
+Score test
+```{r}
+library(statmod)
+m0 <- glm(Age ~ 1,
+                data = crawl,
+                weights = SampleSize,
+                family = gaussian)
+
+t.Ht <- glm.scoretest(m0, crawl$Temp)
+p.Ht <- 2 * pt(-abs(t.Ht), df = df.residual(m0))
+tab <- data.frame(Score.stat = t.Ht, P.value = p.Ht)
+print(tab, digits = 3)
+```
+
+All tests suggest that the predictor is effective (p < 0.05), but the score test is much 
+more conservative (p = 0.041) than the Wald and Likelihood tests (p = 0.002).
+
+***
+
+
+
+### Binomial
+The binomial GLM is used to model proportions.
+
+The mean-variance relationship: $V (\mu) = \mu(1-\mu)$
+
+Dispersion: The dispersion $??$ is known to be $1/m$, no estimation is necessary.However, 
+there may be overdispersion issue.
+
+Link function: 1. logit link function (canonical and default); 2. probit link function; 
+3. complementary log-log link function.The logit and probit link functions are very similar, 
+and both are symmetric about $\mu$ = 0.5, whereas the complementary log-log link function is not.
+
+The ed50 is the value of the covariates when the expected proportion is $\mu$ = 0.5.
+
+Inference: Wald test doesn't work well with binomial GLMs. The score or likelihood ratio 
+tests must be used.
+
+The saddlepoint aprroximation is adequate for binomial distribution when my ??? 3 and 
+m(1 ??? y) ??? 3.
+
+Overdispersion: compare residual deviance and the Pearson goodness-of-fit statistic to the
+residual degrees of freedom. Substantial differences suggest overdispersion. Overdispersion 
+may arises from: 1.the $m_i$ cases, of which observation $y_i$ is a proportion, are not 
+independent. (solution: use hierachical models); 2.the Bernoulli cases, that $m_i$ make up 
+observation, are positively correlated. (solution: Quasi-binomial models)
+
+No Goodness-of-Fit for Binary Responses
+
+Diagnostic analysis of the model:
+quantile residuals against the fitted values
+Q-Q plot
+Cook's distance
+influential observations.
+
+
+
+
+#### Data
+
+The data set is available as the *belection* data in the GLMsData library.
+
+The data give the number of male and females candidates in the British general
+election held April 9, 1992.
+
+
+#### Variables
+
+Region: the region in Britain
+
+Party: the political party
+
+Females: the number of female candidates
+
+Males: the number of male candidates
+
+
+#### Research question
+
+Assuming that the current political parties and views of British voters are 
+similar now as they were in 1992 (which may not be a reasonable assumption),
+what factors can best be used to predict female participation as a candidate
+in British elections?
+
+The factor Party is an effective predictor. Compared to the conservative party, the odds 
+of a female being nominated as a candidate in the Green Party is 3.16 greater. The odds in 
+the Labour Party and Other Party is 2.5 greater and in the Liberty Demoncratic Party is 
+2.78 grater than the consevative party.
+
+
+
+
+#### Analysis
+
+1.Prepare the data
+```{r}
+data(belection)
+str(belection)
+summary(belection)
+```
+
+Let us create a variable Total by summing all male and female candidates.
+```{r}
+belection$Total <- belection$Males + belection$Females
+```
+
+2. Explore the relationship between the response and predictors.
+
+Here is a visual display to help us determine if region make a difference on the proportion 
+of female candidates.
+
+```{r}
+
+plot(Females / Total ~ Region,
+     data = belection,
+     las = 1,
+     ylim = c(0,1))
+
+```
+Overall, there are much more male candiates than female candiates in every region. Several 
+regions have more than 20% female candidates while most regions are below 20%. 
+
+
+Here is a visual display to help us determine if Party makes a difference.
+
+```{r}
+
+plot(Females / Total ~ Party,
+     data = belection,
+     las = 1,
+     ylim = c(0,1))
+
+```
+The Conservative Party on average has 10%, the lowest proportion, female candidates and the 
+Green Party has the highest 30% female candidates. The other three parties have 20% female 
+candiates.
+
+
+3. Fit model.
+
+Let us start with the interaction model
+```{r}
+female.model <- glm(Females / Total ~ Party * Region, 
+                    data = belection, 
+                    family = binomial,
+                    weights = Total)
+anova(female.model, test = "Chisq")
+
+```
+The likelihood test suggests that only Party makes a difference in the proportion of female 
+candidates.
+
+
+
+```{r}
+female.model2 <- glm(Females / Total ~ Party, 
+                    data = belection, 
+                    family = binomial,
+                    weights = Total)
+printCoefmat(coef(summary(female.model2)))
+```
+Party membership does make a difference!
+
+Let us see how R dummy-coded the levels of Party
+```{r}
+contrasts(belection$Party)
+```
+
+
+Now let's look at the effect sizes.
+```{r}
+exp(coef(female.model2))
+```
+Conservative party was set as the reference level by R, so the odds of a female being 
+nominated as a candidate in the Green Party is 3.16 greater than in the conservative Party. 
+The odds in the Labour Party and Other Party is 2.5 greater and in the Liberty Demoncratic 
+Party is 2.78 grater than in the consevative party. 
+
+
+
+4.Diagnostic Analysis
+
+Overdispersion
+```{r}
+c(Df = df.residual(female.model2),
+Resid.Dev = deviance(female.model2),
+Pearson.X2 = sum( resid(female.model2, type="pearson")^2 ))
+```
+There is not too much difference between the three statistics.
+
+
+Quantile residual vs fitted values.
+
+```{r}
+qres <- qresid(female.model2)
+scatter.smooth(qres ~ fitted(female.model2),
+               las = 1,
+               main = "Residuals vs fitted",
+               xlab = "Fitted value",
+               ylab = "Quantile residual")
+
+
+```
+
+
+Q-Q Plot
+```{r}
+qqnorm(qres, las=1 )
+qqline(qres)
+```
+
+Cook's distance
+```{r}
+plot( cooks.distance(female.model2), type="h", las=1)
+```
+The plots are pretty good.
+
+
+Influential observations
+```{r}
+im <- influence.measures(female.model2)
+colSums(im$is.inf)
+```
+The influence diagnostics reveal that two observations are influential according
+to DFFITS, but none are influential according to Cook's distance.
+
+
+#### Additional questions
+
+1. How do you check for overdispersion when modeling proportions?
+
+To look for overdispersion we compare residual deviance and the Pearson goodness-of-fit 
+statistic to the residual degrees of freedom. Substantial differences suggest overdispersion.
+
+2. Is there evidence of overdispersion in your chosen model?
+
+*No evidence of overdispersion. There are not much difference between the residual deviance 
+or the Pearson goodness-of-fit statistic and the residual degrees of freedom.*
+
+```{r}
+c(Df = df.residual(female.model2),
+  Resid.dev = deviance(female.model2),
+  Pearson.X2 = sum(resid(female.model2, type = "pearson")^2))
+```
+
+
+3. Whether or not there is evidence of overdispersion in your model, how would you change 
+your analysis if you **did** detect overdispersion?
+
+Overdispersion can arise from two major causes. The probabilitiesf $\mu_i$ are not 
+constant between observations. Alternatively the $m_i$ cases, of which observation $y_i$ 
+is a proportion, are not independent., we can address this type of overdispersion by a 
+hierachical model. If overdispersion arises when  $m_i$ Bernoulli cases, that make up 
+observations $y_i$, are positively correlated, we could use quasi-binomial models.
+
+***
+
+### Poisson
+The Poisson distribution is used to model count data.
+Poisson glms can be used to model rates (such as counts of cancer cases per unit of 
+population) by using a suitable offset in the linear predictor.
+
+The mean-variance relationship: $V (\mu) = \mu)$
+
+Dispersion: The dispersion $??$ is known to be 1, no estimation is necessary.However, there 
+may be overdispersion issue.
+
+Link function: logit link function (canonical and default).
+
+log-linear model: all explanatory variables are factors, the data can be summarized as a 
+contingency table.
+Poisson regression model: If any of the explanatory variables are quantitative.
+
+
+Structure zeros: Contingency tables may contain cells with zero counts, cells containing 
+structural zeros must be removed from the analysis.
+
+Inference: Wald test, score or likelihood ratio tests can be used.
+
+The saddlepoint aprroximation is adequate for Poisson distribution when y ??? 3.
+
+Overdispersion: occurs when the variation in the responses is greater than expected under 
+the Poisson model. Possible causes are that the model is misspecified (in which case the 
+model should be amended), the means are not constant, or the responses are not independent. 
+(solutions: Negative binomial GLMS and Qusi-poisson models)
+
+
+Diagnostic analysis:
+Overdispersion
+quantile residuals against the fitted values
+Q-Q plot
+Cook's Distance plot
+Influential observation
+
+
+
+The data set is available as the *Sociology Survey Data* in an RData file provided via Blackboard.
+
+Graduate students in sociology and other disciplines were randomly selected from the 
+graduate student population at one university. They were asked, "What is the most important 
+way to reduce crime?"
+
+#### Variables
+
+Response: (1) increase penalties, (2) increase police force, (3) increase
+social services, (4) none of these
+
+Major: (1) sociology, (2) other
+
+Gender: (1) male, (2) female
+
+#### Research questions
+
+How do sociology graduate students differ from other graduate students in their perceptions 
+about dealing with crime? Do these perceptions differ based on gender?
+
+The graudate students from other majors have much lower odds to select $social service$ 
+and $none$ than those who from sociology. The odds ratio for selecting social service is 
+0.06 and the odds ratio for none is 0.09. Gender does not affect the perceptions very much.
+
+#### Analysis
+
+1. Prepare the data.
+```{r}
+load("Sociology Survey Data.RData")
+str(soc_survey)
+head(soc_survey)
+summary(soc_survey)
+```
+
+
+Recode variables as factors.
+```{r}
+soc_survey$response <- factor(soc_survey$response, 
+                              levels = c(1, 2, 3, 4), 
+                              labels = c("penalty", "police force", "social services", "none"))
+soc_survey$major <- factor(soc_survey$major, 
+                           labels = c("Sociology", "Other"))
+soc_survey$gender <- factor(soc_survey$gender, 
+                            labels = c("male", "female"))
+```
+
+Let us calculate counts for each condition cell.
+```{r}
+
+ss.counts <- table(soc_survey)
+
+ss.counts <- data.frame(ss.counts)
+
+names(ss.counts) <- c("Response", "Major", "Gender", "Counts") 
+ss.counts
+```
+
+Remove the cell that contains structure zero
+```{r}
+ss.counts1 <- subset(ss.counts, ss.counts$Counts != 0)
+ss.counts1
+```
+
+
+Here it is as a contingency table.
+
+```{r}
+gm.table <- xtabs(Counts ~ Response+ Major  + Gender, data = ss.counts1)
+gm.table
+```
+
+2. Take a look at the relationship between response and predictors.
+```{r}
+with(ss.counts1,{
+  plot( Counts ~ Response, ylab="Counts", las=1)
+  plot(Counts ~ Major, ylab="Counts", las=1)
+  plot( Counts ~ Gender, ylab="Counts", las=1)
+})
+```
+
+
+
+3. Fit the model.
+
+Let us start with the saturated model.
+```{r}
+ss.m1 <- glm(Counts ~  Major * Gender * Response,
+             data = ss.counts1,
+             family = poisson)
+
+anova(ss.m1, test = "Chisq")
+
+
+```
+The likelihood test suggests that Major has an interaction with response, but gender does 
+not make a difference.
+
+
+```{r}
+ss.m2 <- glm(Counts ~ Major * Response,
+             data = ss.counts1,
+             family = poisson)
+
+anova(ss.m2, test = "Chisq")
+```
+
+The left over (residual) deviance is 5.799 and the associated df is 7. Let's see if this 
+is substantially different than what we expect for df = 7.
+
+```{r}
+
+pchisq(5.799, 7, lower.tail = FALSE)
+
+```
+Overdispersion model is not required.
+
+
+Here are the coefficients.
+
+```{r}
+printCoefmat(coef(summary(ss.m2)))
+```
+The effect sizes.
+```{r}
+exp(coef(ss.m2))
+```
+
+The graudate students from other majors have much lower odds to select $social service$ 
+and $none$ than those who from sociology. The odds ratio for selecting social service is 
+0.06 and the odds ratio for none is 0.09.
+
+
+4.Diagnostic Analysis
+
+Overdispersion
+```{r}
+c(Df = df.residual(ss.m2),
+Resid.Dev = deviance(ss.m2),
+Pearson.X2 = sum( resid(ss.m2, type="pearson")^2 ))
+```
+There is not too much difference between the three statistics.
+
+
+Quantile residual vs fitted values.
+
+```{r}
+qres <- qresid(ss.m2)
+scatter.smooth(qres ~ fitted(ss.m2),
+               las = 1,
+               main = "Residuals vs fitted",
+               xlab = "Fitted value",
+               ylab = "Quantile residual")
+
+
+```
+
+
+Q-Q Plot
+```{r}
+qqnorm(qres, las=1 )
+qqline(qres)
+```
+
+Cook's distance
+```{r}
+plot( cooks.distance(ss.m2), type="h", las=1)
+```
+The plots are not bad.
+
+
+Influential observations
+```{r}
+im <- influence.measures(ss.m2)
+colSums(im$is.inf)
+```
+The influence diagnostics reveal none observations are influential.
+
+
+#### Additional questions
+
+Is there any evidence of Simpson's paradox in these data? How do you know?
+
+No, because there is only one interaction in the model and it doesn't depend on any other factors.
+***
+
+### Gamma
+
+The Gamma distribution is used to model positive continuous data.Positive continuous data often have the variance increasing with increasing mean; the inverse Gaussian distribution is used for data more skewed than that suggested by the gamma distribution.
+
+The mean-variance relationship: $V (\mu) = \mu^2$
+
+Dispersion: The dispersion $??$ is unknown and needs to be estimated. MLE estimator cannot be found in closed form. The deviance is sensitive to very small values of $y_i$ for gamma EDMs, the Pearson estimator(R defualt) is recommended.
+
+Link function: 1. inverse link function (canonical and default); 2. log link function; 3. identity link function. In practice, the log link function is more often used to ensure $u>0$ and for interpretaion purposes. Careful choice of the link function and transformations of the covariates can be used to describe asymptotic relationships between $y$ and $x$.
+
+Inference: Wald, score or likelihood ratio test can be used.
+
+The saddlepoint aprroximation is adequate for Gamma distribution when ?? ??? 1/3.
+
+Overdispersion: 
+1. the $m_i$ cases, of which observation $y_i$ is a proportion, are not independent. (Hierachical models)
+2. the Bernoulli cases, that $m_i$ make up observation, are positively correlated. (Quasi-binomial models)
+
+Diagnostic analysis of the model
+standardized residuals against the fitted values
+Q-Q plot
+Cook's Distance plot
+Influential observation
+
+
+#### Data
+The data set is available as the *blocks* data in the GLMsData library.
+
+Children were seated at a small table and told to build a tower from the blocks
+as high as they could. This was demonstrated for the child. The time taken and 
+the number of blocks used were recorded. The cubes were always presented first, 
+then cylinders. The second trial was conducted one month later.
+
+The blocks were half inch cubes and cylinders included in Mrs. Hailmann's Beads
+No. 470 of Bradley's Kindergarten Material. Throughout the article, the children
+are referred to using male pronouns, but (in keeping with the custom at the
+time) it is unclear whether all children were males or not. However, since 
+gender is not recorded the children may all have been boys.
+
+The source (Johnson and Courtney, 1931) gives the age in years and months. Here
+they have been converted to decimal years.
+
+#### Variables
+
+Child: a child identifier from A to Y
+
+Number: the number of blocks the child could successfully stack
+
+Time: the time (in seconds) taken for the child to make the stack of blocks
+
+Trial: the trial number on which the data were gathered
+
+Shape: the shape of the blocks being stacked, either cubes or cylinders
+
+Age: the age of the child (in years)
+
+#### Research questions
+
+*Note: We need our observations to be independent and there were two trials*
+*in the study, so only use the first trial when analyzing these data.*
+
+Is the shape of the block and age of the child related to the number of blocks
+that they can put into a tower? Are the effects of age different for the 
+different shapes?
+
+Children who is one week older in age tend to use 2 more blcoks to build the tower. As for 
+children of the same age, they use 1 more block to build the cubical tower than the 
+cylindrical tower.
+
+
+
+#### Analysis
+
+1.Prepare the data.
+```{r}
+data(blocks)
+str(blocks)
+```
+
+Subset the data and only select observations of participants' first trial
+```{r}
+block_ft <- subset(blocks, blocks$Trial == 1)
+head(block_ft)
+summary(block_ft)
+```
+Here is a histogram of the mass of the foliage (in kg). 
+
+```{r}
+
+hist(block_ft$Number,
+     xlab = "Number of Blocks",
+     main = "A histogram of the number of blocks")
+
+```
+
+2. Explore the relationships of each explanatory variable with the response variable. 
+
+Let's start with Shape.
+
+```{r}
+
+plot(Number ~ Shape,
+     data = block_ft,
+     las = 1,
+     xlab = "Shape",
+     ylab = "Number of blocks")
+```
+Buiding cubical tower on average requires more blocks than cylindrical tower.
+
+
+Now look at the relationship of number of blocks and age.
+```{r}
+plot(Number ~ Age,
+     data = block_ft,
+     las = 1,
+     xlab = "Age (in years)",
+     ylab = "Number of blocks")
+```
+The number seems to increase as age goes up.
+
+3. Fit the model.
+
+
+```{r}
+block.log <- glm(Number ~ Shape * Age,
+                family = Gamma(link = "identity"),
+                data = block_ft)
+anova(block.log, test = "F")
+```
+
+
+```{r}
+block.log1 <- glm(Number ~ Age * Shape,
+                family = Gamma(link = "identity"),
+                data = block_ft)
+anova(block.log1, test = "F")
+```
+We come to the same conclusion.
+
+
+```{r}
+block.log2 <- glm(Number ~ Shape * Age,
+                family = Gamma(link = "identity"),
+                data = block_ft)
+```
+
+Coefficients and effect sizes
+```{r}
+printCoefmat(coef(summary(block.log2)))
+```
+Children who is one week older in age tend to use 2 more blcoks to build the tower. As for children of the same age, they use 1 more block to build the cubical tower than the cylindrical tower.
+
+
+4.Diagnostic Analysis
+
+Quantile residual vs fitted values.
+
+```{r}
+qres <- qresid(block.log2)
+scatter.smooth(qres ~ fitted(block.log2),
+               las = 1,
+               main = "Residuals vs fitted",
+               xlab = "Fitted value",
+               ylab = "Quantile residual")
+
+
+```
+
+
+Q-Q Plot
+```{r}
+qqnorm(rstandard(block.log2), las=1 )
+qqline(rstandard(block.log2))
+```
+
+Cook's distance
+```{r}
+plot( cooks.distance(block.log2), type="h", las=1)
+```
+The plots are not bad.
+
+
+Influential observations
+```{r}
+im <- influence.measures(block.log2)
+colSums(im$is.inf)
+
+```
+No influential observations were detected according to Cook's distance test.
+
+
+#### Additional exercise
+
+Group ages into three categories and then use the six groupings (three ages by two blocks shapes) to study the mean-variance relationship. Show that the gamma distribution was a good choice for the random component of the model. (To help with your R code, there is a good example of this process on pages 429 and 430 in the textbook.)
+
+```{r}
+block_ft$AgeGroup <- cut(block_ft$Age, breaks = 3) 
+vr <- with(block_ft, tapply(Number, list(AgeGroup, Shape), "var"))
+mn <- with(block_ft, tapply(Number, list(AgeGroup, Shape), "mean"))
+
+plot( log(vr) ~ log(mn), 
+      las=1, 
+      pch=19,
+      xlab="log(group means)", 
+      ylab="log(group variance)")
+
+mf.lm <- lm( c(log(vr)) ~ c(log(mn)) )
+coef( mf.lm )
+abline( coef( mf.lm ), lwd=2)
+```
+The slope for the means is 2.27. The group variance is approximately proportional to square of the group mean. In other words, $V (\mu)$ ??? $\mu^2$ which corresponds to a gamma distribution.
